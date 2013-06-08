@@ -25,20 +25,28 @@
 #define TRUE 1
 #define FALSE 0
 #define KEY_SIZE 6
+#define MAX_ITERATIONS 10000
+
+#define LOG_SHOW_TEXT_AND_PUNCTUATION 0
+int LOG_COUNT;
+float modifier[255];
 
 void simulatedAnnealing(char* cipherText);
-char* generateRandomKey(int numberOfCharacters);
+char* generateRandomKey(char* key, int numberOfCharacters);
 char generateRandomCharacter();
 int firstUse(char aChar, char* inString, int stringSize);
 char* decipher(char* cipherText, char* key);
 float rateFitness(char* text);
-char* slightlyModifiedKey(char* originalKey, int keySize, int numberOfSwapOperations);
+void slightlyModifiedKey(char* originalKey, char* modifiedKey, int keySize, int numberOfSwapOperations);
 float checkForLetters(char* text);
 char charToLowerCase(char c);
 void stringToLowerCase(char* text, int sizeofText);
 float punctuateLetterFrequency(int* hashOfLetterFrequency);
+void initialize();
 
 int main(int argc, char* argv[]) {
+
+  initialize();
 
   char* cipherText;
 
@@ -52,48 +60,78 @@ int main(int argc, char* argv[]) {
 }
 
 void simulatedAnnealing(char* cipherText) {
-  char* firstKey, *secondKey, *firstDecipheredText, *secondDecipheredText;
-  float firstRate, secondRate;
+  char* firstDecipheredText;
+  float firstRate;
+  char* topKey, *topText;
+  float topScore = 0;
 
   srand(time(NULL ));
 
-  // ======================================================
-  firstKey = generateRandomKey(KEY_SIZE);
-  firstDecipheredText = decipher(cipherText, firstKey);
-  firstRate = rateFitness(firstDecipheredText);
-  // ======================================================
+  char* aKey = calloc(1, sizeof(KEY_SIZE));
+  char* modifiedKey = calloc(1, sizeof(KEY_SIZE));
+  topKey = calloc(1, KEY_SIZE);
+  topText = calloc(1, strlen(cipherText));
 
-  // ======================================================
-  secondKey = slightlyModifiedKey(firstKey, KEY_SIZE, 1);
-  secondDecipheredText = decipher(cipherText, firstKey);
-  secondRate = rateFitness(firstDecipheredText);
-  // ======================================================
+  int needToModify = TRUE;
 
-  puts(firstDecipheredText);
+  int numberOfIterations;
 
-  puts(firstKey);
-  puts(secondKey);
+  while (numberOfIterations < MAX_ITERATIONS) {
+    // ======================================================
+    generateRandomKey(aKey, KEY_SIZE);
+    firstDecipheredText = decipher(cipherText, aKey);
+    firstRate = rateFitness(firstDecipheredText);
+    printf("<LOG-%d> 1-Deci-Text: <%s> Punctuation: <%f> with key: <%s>\n", LOG_COUNT, firstDecipheredText, firstRate, aKey);
+    LOG_COUNT++;
+    // ======================================================
+    needToModify = TRUE;
 
-  free(firstDecipheredText);
-  free(firstKey);
-  free(secondKey);
-  free(secondDecipheredText);
+    while (needToModify) {
+      if (firstRate > topScore) {
+        strcpy(topKey, aKey);
+        strcpy(topText, firstDecipheredText);
+        topScore = firstRate;
+        numberOfIterations = 0;
+
+        needToModify = TRUE;
+
+        // ======================================================
+        slightlyModifiedKey(aKey, modifiedKey, KEY_SIZE, 1);
+        firstDecipheredText = decipher(cipherText, modifiedKey);
+        firstRate = rateFitness(firstDecipheredText);
+        printf("<LOG-%d> 1-Deci-Text: <%s> Punctuation: <%f> with key: <%s>\n", LOG_COUNT, firstDecipheredText, firstRate, modifiedKey);
+        LOG_COUNT++;
+        // ======================================================
+
+      } else {
+        needToModify = FALSE;
+      }
+
+    }
+
+    numberOfIterations++;
+
+  }
+
+  printf("<BEST SOLUTION>\n");
+  printf("Text: <%s>\n", topText);
+  printf("Score: <%f>\n", topScore);
+  printf("With Key: <%s>", topKey);
 
 }
 
-char* generateRandomKey(int numberOfCharacters) {
-  char* output = calloc(1, numberOfCharacters);
+char* generateRandomKey(char* key, int numberOfCharacters) {
   int i;
   char aChar;
 
   for (i = 0; i < numberOfCharacters; i++) {
     aChar = generateRandomCharacter();
-    while (!firstUse(aChar, output, i)) {
+    while (!firstUse(aChar, key, i)) {
       aChar = generateRandomCharacter();
     }
-    output[i] = aChar;
+    key[i] = aChar;
   }
-  return output;
+  return key;
 }
 
 char generateRandomCharacter() {
@@ -115,8 +153,11 @@ int firstUse(char aChar, char* inString, int stringSize) {
 }
 
 char* decipher(char* cipherText, char* key) {
+  // for tests purposes only
+
   char* result = calloc(1, 255);
-  strcpy(result, "something really cool will happen herec in <decipher>");
+
+  generateRandomKey(result, 10);
   return result;
 }
 
@@ -133,28 +174,26 @@ float rateFitness(char* text) {
 
 }
 
-char* slightlyModifiedKey(char* originalKey, int keySize, int numberOfSwapOperations) {
+void slightlyModifiedKey(char* originalKey, char* modifiedKey, int keySize, int numberOfSwapOperations) {
   // TODO mudar para imperativo
   int i;
   int changeLetterFrom = 0;
   int changeLetterTo = 0;
-  char* aCopy = calloc(1, keySize);
   char swap;
 
-  strcpy(aCopy, originalKey);
+  strcpy(modifiedKey, originalKey);
 
   for (i = 0; i < numberOfSwapOperations; i++) {
     while (changeLetterFrom == changeLetterTo) {
       changeLetterFrom = rand() % keySize;
       changeLetterTo = rand() % keySize;
     }
-    swap = aCopy[changeLetterFrom];
-    aCopy[changeLetterFrom] = aCopy[changeLetterTo];
-    aCopy[changeLetterTo] = swap;
+    swap = modifiedKey[changeLetterFrom];
+    modifiedKey[changeLetterFrom] = modifiedKey[changeLetterTo];
+    modifiedKey[changeLetterTo] = swap;
 
   }
 
-  return aCopy;
 }
 
 float checkForLetters(char* text) {
@@ -210,8 +249,22 @@ float punctuateLetterFrequency(int* hashOfLetterFrequency) {
    */
 
   int i = 0;
-  float modifier[255], score = 0;
+  float score = 0;
 
+  for (i = 97; i < 123; i++) {
+    score = score + hashOfLetterFrequency[i] * modifier[i];
+
+  }
+
+  return score;
+
+}
+
+void initialize() {
+  /*
+   * for performance
+   */
+  LOG_COUNT = 0;
   modifier['a'] = 14.63;
   modifier['b'] = 1.04;
   modifier['c'] = 3.88;
@@ -238,13 +291,6 @@ float punctuateLetterFrequency(int* hashOfLetterFrequency) {
   modifier['x'] = 0.21;
   modifier['y'] = 0.01;
   modifier['z'] = 0.47;
-
-  for (i = 97; i < 123; i++) {
-    score = score + hashOfLetterFrequency[i] * modifier[i];
-
-  }
-
-  return score;
 
 }
 
