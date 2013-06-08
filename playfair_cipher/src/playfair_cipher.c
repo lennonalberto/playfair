@@ -20,61 +20,128 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 #define TRUE 1
 #define FALSE 0
+#define KEY_SIZE 6
 
-void simulatedAnnealing();
+void simulatedAnnealing(char* cipherText);
 char* generateRandomKey(int numberOfCharacters);
 char generateRandomCharacter();
 int firstUse(char aChar, char* inString, int stringSize);
+char* decipher(char* cipherText, char* key);
+float rateFitness(char* text);
+char* slightlyModifiedKey(char* originalKey, int keySize, int numberOfSwapOperations);
 
 int main(int argc, char* argv[]) {
 
-	simulatedAnnealing();
+  char* cipherText;
+
+  cipherText = calloc(1, 255);
+  strcpy(cipherText, "ENTREINAFEIRAFRUTA");
+  simulatedAnnealing(cipherText);
+
+  free(cipherText);
 
 }
 
-void simulatedAnnealing() {
-	int i;
-	char* aKey;
+void simulatedAnnealing(char* cipherText) {
+  char* firstKey, *secondKey, *firstDecipheredText, *secondDecipheredText;
+  float firstRate, secondRate;
 
-	srand(time(NULL ));
-	aKey = generateRandomKey(6);
-	puts(aKey);
+  srand(time(NULL ));
+
+  // ======================================================
+  firstKey = generateRandomKey(KEY_SIZE);
+  firstDecipheredText = decipher(cipherText, firstKey);
+  firstRate = rateFitness(firstDecipheredText);
+  // ======================================================
+
+  // ======================================================
+  secondKey = slightlyModifiedKey(firstKey, KEY_SIZE, 1);
+  secondDecipheredText = decipher(cipherText, firstKey);
+  secondRate = rateFitness(firstDecipheredText);
+  // ======================================================
+
+  puts(firstDecipheredText);
+
+  puts(firstKey);
+  puts(secondKey);
+
+  free(firstDecipheredText);
+  free(firstKey);
+  free(secondKey);
+  free(secondDecipheredText);
 
 }
 
 char* generateRandomKey(int numberOfCharacters) {
-	char* output = calloc(1, numberOfCharacters);
-	int i;
-	char aChar;
+  char* output = calloc(1, numberOfCharacters);
+  int i;
+  char aChar;
 
-	for (i = 0; i < numberOfCharacters; i++) {
-		aChar = generateRandomCharacter();
-		while (!firstUse(aChar, output, i)) {
-			aChar = generateRandomCharacter();
-		}
-		output[i] = aChar;
-	}
-	return output;
+  for (i = 0; i < numberOfCharacters; i++) {
+    aChar = generateRandomCharacter();
+    while (!firstUse(aChar, output, i)) {
+      aChar = generateRandomCharacter();
+    }
+    output[i] = aChar;
+  }
+  return output;
 }
 
 char generateRandomCharacter() {
-	int randomNumber = rand() % 26;
-	char aChar = 97 + randomNumber;
+  int aRandomNumber = rand() % 26;
+  char aChar = 97 + aRandomNumber;
 
-	return aChar;
+  return aChar;
 }
 
 int firstUse(char aChar, char* inString, int stringSize) {
-	int i;
+  int i;
 
-	for (i = 0; i < stringSize; i++) {
-		if (inString[i] == aChar) {
-			return FALSE;
-		}
-	}
-	return TRUE;
+  for (i = 0; i < stringSize; i++) {
+    if (inString[i] == aChar) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+char* decipher(char* cipherText, char* key) {
+  char* result = calloc(1, 255);
+  strcpy(result, "something really cool will happen here");
+  return result;
+}
+
+float rateFitness(char* text) {
+
+  return 100;
+
+}
+
+char* slightlyModifiedKey(char* originalKey, int keySize, int numberOfSwapOperations) {
+  // TODO mudar para imperativo
+  int i;
+  int changeLetterFrom = 0;
+  int changeLetterTo = 0;
+  char* aCopy = calloc(1, keySize);
+  char swap;
+
+  strcpy(aCopy, originalKey);
+
+  for (i = 0; i < numberOfSwapOperations; i++) {
+    while (changeLetterFrom == changeLetterTo) {
+      changeLetterFrom = rand() % keySize;
+      changeLetterTo = rand() % keySize;
+    }
+    swap = aCopy[changeLetterFrom];
+    aCopy[changeLetterFrom] = aCopy[changeLetterTo];
+    aCopy[changeLetterTo] = swap;
+
+  }
+
+  return aCopy;
 }
 
