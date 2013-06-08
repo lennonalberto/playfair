@@ -25,11 +25,13 @@
 #define TRUE 1
 #define FALSE 0
 #define KEY_SIZE 6
-#define MAX_ITERATIONS 10000
+#define MAX_ITERATIONS 100000
+#define DIGRAPH_IMPLICIT_MODIFIER 2
 
 #define LOG_SHOW_TEXT_AND_PUNCTUATION 0
 int LOG_COUNT;
-float modifier[255];
+float letterModifier[255];
+float digraphModifier[255][255];
 
 void simulatedAnnealing(char* cipherText);
 char* generateRandomKey(char* key, int numberOfCharacters);
@@ -41,8 +43,10 @@ void slightlyModifiedKey(char* originalKey, char* modifiedKey, int keySize, int 
 float checkForLetters(char* text);
 char charToLowerCase(char c);
 void stringToLowerCase(char* text, int sizeofText);
-float punctuateLetterFrequency(int* hashOfLetterFrequency);
+float scoreLetterFrequency(int* hashOfLetterFrequency);
 void initialize();
+void digraphInitialize();
+float checkForDigraphs(char* text);
 
 int main(int argc, char* argv[]) {
 
@@ -81,7 +85,7 @@ void simulatedAnnealing(char* cipherText) {
     generateRandomKey(aKey, KEY_SIZE);
     firstDecipheredText = decipher(cipherText, aKey);
     firstRate = rateFitness(firstDecipheredText);
-    printf("<LOG-%d> 1-Deci-Text: <%s> Punctuation: <%f> with key: <%s>\n", LOG_COUNT, firstDecipheredText, firstRate, aKey);
+    printf("<LOG-%d> 1-Deci-Text: <%s> Score: <%f> with key: <%s>\n", LOG_COUNT, firstDecipheredText, firstRate, aKey);
     LOG_COUNT++;
     // ======================================================
     needToModify = TRUE;
@@ -99,7 +103,7 @@ void simulatedAnnealing(char* cipherText) {
         slightlyModifiedKey(aKey, modifiedKey, KEY_SIZE, 1);
         firstDecipheredText = decipher(cipherText, modifiedKey);
         firstRate = rateFitness(firstDecipheredText);
-        printf("<LOG-%d> 1-Deci-Text: <%s> Punctuation: <%f> with key: <%s>\n", LOG_COUNT, firstDecipheredText, firstRate, modifiedKey);
+        printf("<LOG-%d> 1-Deci-Text: <%s> Score: <%f> with key: <%s>\n", LOG_COUNT, firstDecipheredText, firstRate, modifiedKey);
         LOG_COUNT++;
         // ======================================================
 
@@ -108,7 +112,6 @@ void simulatedAnnealing(char* cipherText) {
       }
 
     }
-
     numberOfIterations++;
 
   }
@@ -169,6 +172,7 @@ float rateFitness(char* text) {
   float totalScore = 0;
 
   totalScore = checkForLetters(text);
+  totalScore = totalScore + checkForDigraphs(text);
 
   return totalScore;
 
@@ -213,7 +217,7 @@ float checkForLetters(char* text) {
     lettersHash[aChar] = lettersHash[aChar]++;
   }
 
-  score = punctuateLetterFrequency(lettersHash);
+  score = scoreLetterFrequency(lettersHash);
   free(lettersHash);
   return score;
 
@@ -242,7 +246,7 @@ void stringToLowerCase(char* text, int sizeofText) {
 
 }
 
-float punctuateLetterFrequency(int* hashOfLetterFrequency) {
+float scoreLetterFrequency(int* hashOfLetterFrequency) {
   /*
    * SOURCE
    * http://pt.wikipedia.org/wiki/Frequ%C3%AAncia_de_letras
@@ -252,7 +256,7 @@ float punctuateLetterFrequency(int* hashOfLetterFrequency) {
   float score = 0;
 
   for (i = 97; i < 123; i++) {
-    score = score + hashOfLetterFrequency[i] * modifier[i];
+    score = score + hashOfLetterFrequency[i] * letterModifier[i];
 
   }
 
@@ -262,35 +266,85 @@ float punctuateLetterFrequency(int* hashOfLetterFrequency) {
 
 void initialize() {
   /*
-   * for performance
+   * performance purposes
    */
   LOG_COUNT = 0;
-  modifier['a'] = 14.63;
-  modifier['b'] = 1.04;
-  modifier['c'] = 3.88;
-  modifier['d'] = 4.99;
-  modifier['e'] = 12.57;
-  modifier['f'] = 1.02;
-  modifier['g'] = 1.30;
-  modifier['h'] = 1.28;
-  modifier['i'] = 6.18;
-  modifier['j'] = 0.40;
-  modifier['k'] = 0.02;
-  modifier['l'] = 2.78;
-  modifier['m'] = 4.74;
-  modifier['n'] = 5.05;
-  modifier['o'] = 10.73;
-  modifier['p'] = 2.52;
-  modifier['q'] = 1.20;
-  modifier['r'] = 6.53;
-  modifier['s'] = 7.81;
-  modifier['t'] = 4.74;
-  modifier['u'] = 4.63;
-  modifier['v'] = 1.67;
-  modifier['w'] = 0.01;
-  modifier['x'] = 0.21;
-  modifier['y'] = 0.01;
-  modifier['z'] = 0.47;
+  letterModifier['a'] = 14.63;
+  letterModifier['b'] = 1.04;
+  letterModifier['c'] = 3.88;
+  letterModifier['d'] = 4.99;
+  letterModifier['e'] = 12.57;
+  letterModifier['f'] = 1.02;
+  letterModifier['g'] = 1.30;
+  letterModifier['h'] = 1.28;
+  letterModifier['i'] = 6.18;
+  letterModifier['j'] = 0.40;
+  letterModifier['k'] = 0.02;
+  letterModifier['l'] = 2.78;
+  letterModifier['m'] = 4.74;
+  letterModifier['n'] = 5.05;
+  letterModifier['o'] = 10.73;
+  letterModifier['p'] = 2.52;
+  letterModifier['q'] = 1.20;
+  letterModifier['r'] = 6.53;
+  letterModifier['s'] = 7.81;
+  letterModifier['t'] = 4.74;
+  letterModifier['u'] = 4.63;
+  letterModifier['v'] = 1.67;
+  letterModifier['w'] = 0.01;
+  letterModifier['x'] = 0.21;
+  letterModifier['y'] = 0.01;
+  letterModifier['z'] = 0.47;
+
+  digraphInitialize();
+
+}
+
+float checkForDigraphs(char* text) {
+  int i = 0, sizeofText;
+  char firstChar, secondChar, thirdChar;
+  float firstScore = 0, secondScore = 0, result = 0;
+
+  sizeofText = strlen(text);
+
+  for (i = 0; i < sizeofText; i = i + 2) {
+    firstChar = text[i];
+    secondChar = text[i + 1];
+    firstScore = firstScore + digraphModifier[firstChar][secondChar];
+    if ((i + 2) < sizeofText) {
+      thirdChar = text[i + 2];
+      secondScore = secondScore + digraphModifier[secondChar][thirdChar];
+    }
+
+  }
+
+  result = firstScore > secondScore ? firstScore : secondScore;
+
+  return result * DIGRAPH_IMPLICIT_MODIFIER;
+
+}
+
+void digraphInitialize() {
+  FILE *inputFile;
+  char i, j;
+
+  /*
+   * SOURCE: http://www.dcc.fc.up.pt/~rvr/naulas/tabelasPT/
+   */
+
+  inputFile = fopen("/home/lwf09/digraphsInput.txt", "r");
+  float value;
+
+  for (i = 'a'; i <= 'z'; i++) {
+    for (j = 'a'; j <= 'z'; j++) {
+      char line[128]; /* or other suitable maximum line size */
+      fgets(line, sizeof line, inputFile);
+      value = atof(line);
+      digraphModifier[i][j] = value;
+    }
+  }
+
+  fclose(inputFile);
 
 }
 
