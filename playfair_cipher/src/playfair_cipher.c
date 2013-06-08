@@ -30,13 +30,17 @@ char generateRandomCharacter();
 int firstUse(char aChar, char* inString, int stringSize);
 
 int main(int argc, char* argv[]) {
+
 	simulatedAnnealing();
 
 }
 
 void simulatedAnnealing() {
-	char* aKey = generateRandomKey(6);
+	int i;
+	char* aKey;
 
+	srand(time(NULL ));
+	aKey = generateRandomKey(6);
 	puts(aKey);
 
 }
@@ -48,20 +52,15 @@ char* generateRandomKey(int numberOfCharacters) {
 
 	for (i = 0; i < numberOfCharacters; i++) {
 		aChar = generateRandomCharacter();
-
 		while (!firstUse(aChar, output, i)) {
 			aChar = generateRandomCharacter();
 		}
-
 		output[i] = aChar;
-
 	}
-
 	return output;
 }
 
 char generateRandomCharacter() {
-	srand(time(NULL ));
 	int randomNumber = rand() % 26;
 	char aChar = 97 + randomNumber;
 
@@ -72,11 +71,10 @@ int firstUse(char aChar, char* inString, int stringSize) {
 	int i;
 
 	for (i = 0; i < stringSize; i++) {
-		if (inString[i] == aChar)
+		if (inString[i] == aChar) {
 			return FALSE;
-
+		}
 	}
 	return TRUE;
-
 }
 
