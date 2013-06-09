@@ -21,19 +21,25 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
 #define TRUE 1
 #define FALSE 0
 #define KEY_SIZE 6
 #define MAX_ITERATIONS 100000
-#define DIGRAPH_IMPLICIT_MODIFIER 2
+#define DIGRAPH_IMPLICIT_MODIFIER 1.3
+#define TRIGRAPH_IMPLICIT_MODIFIER 1.6
+#define TEMPERATURE 40
+#define STEP 0.2
 
-#define LOG_SHOW_TEXT_AND_PUNCTUATION 0
 int LOG_COUNT;
 float letterModifier[255];
 float digraphModifier[255][255];
+char trigrams[255][255];
+float trigramsValues[255];
+int trigramsQuantity;
 
-void simulatedAnnealing(char* cipherText);
+void hillClimbing(char* cipherText);
 char* generateRandomKey(char* key, int numberOfCharacters);
 char generateRandomCharacter();
 int firstUse(char aChar, char* inString, int stringSize);
@@ -47,6 +53,16 @@ float scoreLetterFrequency(int* hashOfLetterFrequency);
 void initialize();
 void digraphInitialize();
 float checkForDigraphs(char* text);
+void reverseKey(char* key);
+void replaceCharacter(char* key);
+void swapCharacters(char* key);
+void simulatedAnnealing(char* cipherText);
+void modifyKey(char *originalKey, char *modifiedKey);
+void newDecipher(char* decipheredText, char* cipheredText, char* key);
+void trigraphInitialize();
+void trim(char* dest);
+float getTrigramScore(char* trigram);
+float checkForTrigraphs(char* text);
 
 int main(int argc, char* argv[]) {
 
@@ -55,21 +71,93 @@ int main(int argc, char* argv[]) {
   char* cipherText;
 
   cipherText = calloc(1, 255);
-  strcpy(cipherText, "ENTREINAFEIRADAFRUTA");
+  strcpy(cipherText, "ouviramdoipirangaasmargensplacidasdeumpovoheroicobradoretumbante");
   stringToLowerCase(cipherText, strlen(cipherText));
+//  hillClimbing(cipherText);
+  printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("ouviramdoipirangaasmargensplacidasdeumpovoheroicobradoretumbante"));
+  printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("umafraseemportuguesbemgrandeporxemplocomdiversoscaracteresbanana"));
+  printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("quequequequequequequequequequequequequequequequequequequequequea"));
+//  printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("umtextomuitogenerico"));
+//  printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("praveroquefeiradafru"));
   simulatedAnnealing(cipherText);
 
+
   free(cipherText);
+
+  return 0;
 
 }
 
 void simulatedAnnealing(char* cipherText) {
+
+  /*
+   1. Generate a random key, called the 'parent', decipher the ciphertext
+   using this key.
+   2. Rate the fitness of the deciphered text, store the result.
+   3. for(TEMP = 10;TEMP >= 0; TEMP = TEMP - STEP)
+   for (count = 50,000; count>0; count--)
+   Change the parent key slightly (e.g. swap two characters in the
+   key at random) to get child key,
+   Measure the fitness of the deciphered text using the child key
+   set dF = (fitness of child - fitness of parent)
+   If dF > 0 (fitness of child is higher than parent key),
+   set parent = child
+   If dF < 0 (fitness of child is worse than parent),
+   set parent = child with probability e^(dF/T).
+   */
+
+  char* keyParent, *testKey, *topText, *maxKey, *decipheredText, *bestKey;
+  float dF = 0, fitnessParent = 0, fitnessChild = 0, T, topScore, score, prob, maxscore, bestscore, mystery;
+  int count, sizeofText;
+
+  bestKey = calloc(1, KEY_SIZE);
+  maxKey = calloc(1, KEY_SIZE);
+  keyParent = calloc(1, KEY_SIZE);
+  testKey = calloc(1, KEY_SIZE);
+  decipheredText = calloc(1, 1024);
+  sizeofText = strlen(cipherText);
+
+  generateRandomKey(maxKey, KEY_SIZE);
+  strcpy(bestKey, maxKey);
+  newDecipher(decipheredText, cipherText, maxKey);
+  maxscore = rateFitness(decipheredText);
+  bestscore = maxscore;
+
+  for (T = TEMPERATURE; T >= 0; T -= STEP) {
+    for (count = 0; count < MAX_ITERATIONS; count++) {
+      modifyKey(maxKey, testKey);
+      newDecipher(decipheredText, cipherText, testKey);
+      score = rateFitness(decipheredText);
+      dF = score - maxscore;
+      if (dF >= 0) {
+        maxscore = score;
+        strcpy(maxKey, testKey);
+      } else if (T > 0) {
+        prob = exp(dF / T);
+        mystery = 1.0 * rand() / RAND_MAX;
+        if (prob > mystery) {
+          maxscore = score;
+          strcpy(maxKey, testKey);
+        }
+      }
+      if (maxscore > bestscore) {
+        bestscore = maxscore;
+        strcpy(bestKey, maxKey);
+        printf("best text so far <%s> with score <%f> and key <%s>\n", decipheredText, bestscore, bestKey);
+      }
+    }
+  }
+
+  free(keyParent);
+  free(testKey);
+
+}
+
+void hillClimbing(char* cipherText) {
   char* firstDecipheredText;
   float firstRate;
   char* topKey, *topText;
   float topScore = 0;
-
-  srand(time(NULL ));
 
   char* aKey = calloc(1, sizeof(KEY_SIZE));
   char* modifiedKey = calloc(1, sizeof(KEY_SIZE));
@@ -173,6 +261,7 @@ float rateFitness(char* text) {
 
   totalScore = checkForLetters(text);
   totalScore = totalScore + checkForDigraphs(text);
+  totalScore = totalScore + checkForTrigraphs(text);
 
   return totalScore;
 
@@ -268,6 +357,7 @@ void initialize() {
   /*
    * performance purposes
    */
+  srand(time(NULL ));
   LOG_COUNT = 0;
   letterModifier['a'] = 14.63;
   letterModifier['b'] = 1.04;
@@ -298,29 +388,7 @@ void initialize() {
 
   digraphInitialize();
 
-}
-
-float checkForDigraphs(char* text) {
-  int i = 0, sizeofText;
-  char firstChar, secondChar, thirdChar;
-  float firstScore = 0, secondScore = 0, result = 0;
-
-  sizeofText = strlen(text);
-
-  for (i = 0; i < sizeofText; i = i + 2) {
-    firstChar = text[i];
-    secondChar = text[i + 1];
-    firstScore = firstScore + digraphModifier[firstChar][secondChar];
-    if ((i + 2) < sizeofText) {
-      thirdChar = text[i + 2];
-      secondScore = secondScore + digraphModifier[secondChar][thirdChar];
-    }
-
-  }
-
-  result = firstScore > secondScore ? firstScore : secondScore;
-
-  return result * DIGRAPH_IMPLICIT_MODIFIER;
+  trigraphInitialize();
 
 }
 
@@ -345,6 +413,188 @@ void digraphInitialize() {
   }
 
   fclose(inputFile);
+
+}
+
+void modifyKey(char *originalKey, char *modifiedKey) {
+  /*
+   * 10% new char, 10% reverse key, 80% swap characters
+   */
+
+  strcpy(modifiedKey, originalKey);
+
+  int decision = rand() % 10;
+
+  switch (decision) {
+  case 1:
+    reverseKey(originalKey);
+
+    break;
+  case 2:
+    replaceCharacter(originalKey);
+
+    break;
+  default:
+    swapCharacters(originalKey);
+    break;
+  }
+
+}
+
+void swapCharacters(char* key) {
+  int keySize = KEY_SIZE, changeLetterFrom = 0, changeLetterTo = 0;
+  char swap;
+  while (changeLetterFrom == changeLetterTo) {
+    changeLetterFrom = rand() % keySize;
+    changeLetterTo = rand() % keySize;
+  }
+  swap = key[changeLetterFrom];
+  key[changeLetterFrom] = key[changeLetterTo];
+  key[changeLetterTo] = swap;
+}
+
+void replaceCharacter(char* key) {
+  int replaceCharacterWithIndex = 0;
+  char replaceWith;
+  replaceCharacterWithIndex = rand() % KEY_SIZE;
+  replaceWith = generateRandomCharacter();
+  while (!firstUse(replaceWith, key, KEY_SIZE)) {
+    replaceWith = generateRandomCharacter();
+  }
+
+  key[replaceCharacterWithIndex] = replaceWith;
+
+}
+
+void reverseKey(char* key) {
+  int i = 0, currentPosition = 0;
+  char swap;
+  for (i = KEY_SIZE - 1; i >= 0; i--) {
+    swap = key[currentPosition];
+    key[currentPosition] = key[i];
+    key[i] = swap;
+  }
+}
+
+void newDecipher(char* decipheredText, char* cipheredText, char* key) {
+  int i = 0, sizeofText = strlen(cipheredText);
+
+  for (i = 0; i < sizeofText; i++) {
+    decipheredText[i] = generateRandomCharacter();
+
+  }
+
+}
+
+void trigraphInitialize() {
+
+  FILE *inputFile;
+  char numberOfTrigrams = 0;
+  float value;
+
+  /*
+   * SOURCE: http://www.dcc.fc.up.pt/~rvr/naulas/tabelasPT/
+   */
+
+  inputFile = fopen("/home/lwf09/trigraphsInput.txt", "r");
+
+  char line[128]; /* or other suitable maximum line size */
+  while (fgets(line, sizeof line, inputFile) != NULL ) {
+    trim(line);
+    value = atof(line);
+    // ok.. bad practice but...
+    if (!value) {
+      strcpy(trigrams[numberOfTrigrams], line);
+
+    } else {
+      trigramsValues[numberOfTrigrams] = value;
+      numberOfTrigrams++;
+    }
+  }
+  trigramsQuantity = numberOfTrigrams;
+
+  fclose(inputFile);
+
+}
+
+void trim(char* dest) {
+  int size = strlen(dest);
+  dest[size - 1] = '\0';
+}
+
+float getTrigramScore(char* trigram) {
+  float score = 0;
+  char* currentTrigram;
+  int i = 0;
+
+  for (i = 0; i < trigramsQuantity; i++) {
+    currentTrigram = trigrams[i];
+    if (!strcmp(currentTrigram, trigram)) {
+      score = trigramsValues[i];
+    }
+
+  }
+  return score;
+
+}
+
+float checkForTrigraphs(char* text) {
+  int sizeofText = strlen(text), i = 0, j = 0;
+  float score[3], bestScore;
+  char *aTrigraph;
+
+  aTrigraph = calloc(1, 10);
+
+  for (i = 0; i < 3; i++) {
+    score[i] = 0;
+  }
+
+  for (i = 0; i < sizeofText; i++) {
+    memset(aTrigraph, 0, 3);
+    for (j = 0; j < 3; j++) {
+      if ((i + j) < sizeofText) {
+        aTrigraph[j] = text[i + j];
+      }
+
+    }
+    if (strlen(aTrigraph) == 3) {
+      score[i % 3] = score[i % 3] + getTrigramScore(aTrigraph);
+    }
+
+  }
+  bestScore = 0;
+  for (i = 0; i < 3; i++) {
+    if (score[i] > bestScore) {
+      bestScore = score[i];
+    }
+  }
+
+  free(aTrigraph);
+  return bestScore * TRIGRAPH_IMPLICIT_MODIFIER;
+
+}
+
+float checkForDigraphs(char* text) {
+  int i = 0, sizeofText;
+  char firstChar, secondChar, thirdChar;
+  float firstScore = 0, secondScore = 0, result = 0;
+
+  sizeofText = strlen(text);
+
+  for (i = 0; i < sizeofText; i = i + 2) {
+    firstChar = text[i];
+    secondChar = text[i + 1];
+    firstScore = firstScore + digraphModifier[firstChar][secondChar];
+    if ((i + 2) < sizeofText) {
+      thirdChar = text[i + 2];
+      secondScore = secondScore + digraphModifier[secondChar][thirdChar];
+    }
+
+  }
+
+  result = firstScore > secondScore ? firstScore : secondScore;
+
+  return result * DIGRAPH_IMPLICIT_MODIFIER;
 
 }
 
