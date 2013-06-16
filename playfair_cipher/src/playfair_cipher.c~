@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
 
   cipherText = calloc(1, 255);
   strcpy(cipherText, "ouviramdoipirangaasmargensplacidasdeumpovoheroicobradoretumbante");
-  stringToLowerCase(cipherText, strlen(cipherText));
+  stringToLowerCase(cipherText, strlen(cipherText)-1);
 //  hillClimbing(cipherText);
   printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("ouviramdoipirangaasmargensplacidasdeumpovoheroicobradoretumbante"));
   printf("esse e o score de uma frase em portugues <%f>\n", rateFitness("umafraseemportuguesbemgrandeporxemplocomdiversoscaracteresbanana"));
